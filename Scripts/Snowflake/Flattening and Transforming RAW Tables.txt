@@ -1,0 +1,218 @@
+//***************************************************TRANSFORMING WEBSCRAPED DATA******************************************************************
+
+//***********************************FLATTEN AND TRANSFORM WEATHER DATA**********************************************
+CREATE OR REPLACE SCHEMA TRANSFORM.DELAY_DATA;
+
+CREATE OR REPLACE TABLE TRANSFORM.DELAY_DATA.WEATHER_FLATTENED AS
+SELECT RAW:City as CITY,
+  RAW:Date AS DATE,
+  RAW:Month AS MONTH,
+  RAW:Year AS YEAR,
+  RAW:Hour AS HOUR,
+  RAW:Temperature AS TEMPERATURE,
+  RAW:Forecast AS FORECAST,
+  RAW:"Cloud Cover" AS CLOUD_COVER,
+  RAW:"Cloud Ceiling" AS CLOUD_CEILING,
+  RAW:Visibility AS VISIBILITY,
+  RAW:Precipitation AS PRECIPITATION,
+  RAW:Wind AS WIND,
+  RAW:"Wind Gusts" AS WIND_GUSTS
+FROM RAW.DELAY_DATA.WEATHER_WEBSCRAPED;
+
+CREATE OR REPLACE TABLE TRANSFORM.DELAY_DATA.WEATHER_TRANSFORMED AS
+SELECT 
+CASE
+    WHEN CITY='delhi' THEN 'Delhi'
+    WHEN CITY='chennai' THEN 'Chennai'
+    WHEN CITY='bengaluru' THEN 'Bengaluru'
+    WHEN CITY='mumbai' THEN 'Mumbai'
+    WHEN CITY='kolkatta' THEN 'Kolkata'
+    WHEN CITY='hyderabad' THEN 'Hyderabad'
+    ELSE 'other'
+    END AS CITY,
+CONCAT(YEAR,'-',MONTH,'-',DATE) AS DATE,
+CASE 
+    WHEN SPLIT_PART(HOUR,' ',2)='AM' THEN CAST(SPLIT_PART(HOUR,' ',1) AS INTEGER)
+    WHEN SPLIT_PART(HOUR,' ',2)='PM' THEN CAST((SPLIT_PART(HOUR,' ',1)+12) AS INTEGER)
+    END AS HOUR,
+CAST(SUBSTR(TEMPERATURE,1,2) AS INTEGER) AS TEMPERATURE,
+CASE
+    WHEN FORECAST='Mostly cloudy' THEN 'Cloudy'
+    WHEN FORECAST='Intermittent clouds' THEN 'Cloudy'
+    WHEN FORECAST='Partly cloudy' THEN 'Cloudy'
+    WHEN FORECAST='Clear' THEN 'Sunny'
+    WHEN FORECAST='Sunny' THEN 'Sunny'
+    WHEN FORECAST='Partly sunny' THEN 'Sunny'
+    WHEN FORECAST='Thunderstorms' THEN 'Thunderstorms'
+    WHEN FORECAST='Rain' THEN 'Thunderstorms'
+    WHEN FORECAST='Cloudy' THEN 'Cloudy'
+    WHEN FORECAST='Showers' THEN 'Showers'
+    WHEN FORECAST='Mostly cloudy w/ showers' THEN 'Showers'
+    WHEN FORECAST='Mostly sunny' THEN 'Sunny'
+    END AS FORECAST,
+CAST(REPLACE(CLOUD_COVER,'%') AS INTEGER) AS CLOUD_COVER,
+CAST(REPLACE(CLOUD_CEILING,' m') AS INTEGER) AS CLOUD_CEILING,
+CAST(REPLACE(VISIBILITY,' km') AS INTEGER) AS VISIBILITY,
+CAST(REPLACE(PRECIPITATION,'%') AS INTEGER) AS PRECIPITATION,
+CAST(split_part(WIND,' ',2) AS INTEGER) AS WIND,
+CAST(REPLACE(WIND_GUSTS,' km/h') AS INTEGER) AS WIND_GUSTS
+FROM TRANSFORM.DELAY_DATA.WEATHER_FLATTENED;
+
+
+
+
+
+//***********************************FLATTEN AND TRANSFORM FLIGHT DATA**********************************************
+
+
+CREATE OR REPLACE TABLE TRANSFORM.DELAY_DATA.FLIGHTS_FLATTENED AS
+SELECT RAW:ID AS ID,
+  RAW:Airline as AIRLINE,
+  RAW:Date AS DATE,
+  RAW:Source AS SOURCE,
+  RAW:Departure_Time AS DEPARTURE_TIME,
+  RAW:Destination AS DESTINATION,
+  RAW:Arrival_Time AS ARRIVAL_TIME,
+  RAW:Class AS CLASS,
+  RAW:Duration AS DURATION,
+  RAW:Price AS PRICE,
+  RAW:Stops AS STOPS
+FROM RAW.DELAY_DATA.FLIGHTS_WEBSCRAPED;
+
+CREATE OR REPLACE TABLE TRANSFORM.DELAY_DATA.FLIGHT_TRANSFORMED AS
+SELECT 
+AIRLINE,
+TO_DATE(DATE) AS DATE,
+CASE
+    WHEN SOURCE='DEL' THEN 'Delhi'
+    WHEN SOURCE='BOM' THEN 'Mumbai'
+    WHEN SOURCE='BLR' THEN 'Bengaluru'
+    WHEN SOURCE='MAA' THEN 'Chennai'
+    WHEN SOURCE='CCU' THEN 'Kolkata'
+    WHEN SOURCE='HYD' THEN 'Hyderabad'
+    END AS SOURCE,
+    TO_VARCHAR(DEPARTURE_TIME) AS DEPARTURE_TIME ,
+CAST(split_part(DEPARTURE_TIME,':',1) AS INTEGER) AS DEPARTURE_HOUR,
+CASE
+    WHEN DESTINATION='DEL' THEN 'Delhi'
+    WHEN DESTINATION='BOM' THEN 'Mumbai'
+    WHEN DESTINATION='BLR' THEN 'Bengaluru'
+    WHEN DESTINATION='MAA' THEN 'Chennai'
+    WHEN DESTINATION='CCU' THEN 'Kolkata'
+    WHEN DESTINATION='HYD' THEN 'Hyderabad'
+    END AS DESTINATION,
+TO_VARCHAR(ARRIVAL_TIME) AS ARRIVAL_TIME,
+TO_VARCHAR(CLASS) AS CLASS,
+TO_VARCHAR(DURATION) AS DURATION,
+CAST(PRICE AS INTEGER) AS PRICE,
+TO_VARCHAR(STOPS) AS STOPS,
+FROM TRANSFORM.DELAY_DATA.FLIGHTS_FLATTENED;
+
+
+//***********************************REPLACING NULLS IN FLIGHT DATA**********************************************
+
+CREATE TABLE TRANSFORM.ACCIDENT_DATA.FLIGHT_ACCIDENT CLONE raw.accident_data.flight_accident;
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET AccidentNumber = 'NA'
+WHERE AccidentNumber IS NULL or trim(AccidentNumber)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET EventDate = 'NA'
+WHERE EventDate IS NULL or trim(EventDate)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET Location = 'NA'
+WHERE Location IS NULL or trim(Location)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET Country = 'NA'
+WHERE Country IS NULL or trim(Country)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET Longitude = 'NA'
+WHERE Longitude IS NULL or trim(Longitude)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET AirportCode = 'NA'
+WHERE AirportCode IS NULL or trim(AirportCode)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET InjurySeverity = 'NA'
+WHERE InjurySeverity IS NULL or trim(InjurySeverity)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET Aircraftdamage = 'NA'
+WHERE Aircraftdamage IS NULL or trim(Aircraftdamage)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET AircraftCategory = 'NA'
+WHERE AircraftCategory IS NULL or trim(AircraftCategory)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET RegistrationNumber = 'NA'
+WHERE RegistrationNumber IS NULL or trim(RegistrationNumber)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET Make = 'NA'
+WHERE Make IS NULL or trim(Make)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET Model = 'NA'
+WHERE Model IS NULL or trim(Model)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET AmateurBuilt = 'NA'
+WHERE AmateurBuilt IS NULL or trim(AmateurBuilt)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET NumberOfEngines = 'NA'
+WHERE NumberOfEngines IS NULL or trim(NumberOfEngines)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET EngineType = 'NA'
+WHERE EngineType IS NULL or trim(EngineType)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET FARDescription = 'NA'
+WHERE FARDescription IS NULL or trim(FARDescription)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET Schedule = 'NA'
+WHERE Schedule IS NULL or trim(Schedule)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET  Purpose_of_flight = 'NA'
+WHERE  Purpose_of_flight IS NULL or trim(Purpose_of_flight)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET Total_Fatal_Injuries = 'NA'
+WHERE Total_Fatal_Injuries IS NULL or trim(Total_Fatal_Injuries)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET Total_Serious_Injuries = 'NA'
+WHERE Total_Serious_Injuries IS NULL or trim(Total_Serious_Injuries)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET Total_Minor_Injuries = 'NA'
+WHERE Total_Minor_Injuries IS NULL or trim(Total_Minor_Injuries)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET Total_Uninjured = 'NA'
+WHERE Total_Uninjured IS NULL or trim(Total_Uninjured)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET Weather_Condition = 'NA'
+WHERE Weather_Condition IS NULL or trim(Weather_Condition)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET Broad_phase_of_flight = 'NA'
+WHERE Broad_phase_of_flight IS NULL or trim(Broad_phase_of_flight)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET Publication_Date = 'NA'
+WHERE Publication_Date IS NULL or trim(Publication_Date)= '';
+
+UPDATE TRANSFORM.accident_data.flight_accident
+SET Latitude = 'NA'
+WHERE Latitude IS NULL;
